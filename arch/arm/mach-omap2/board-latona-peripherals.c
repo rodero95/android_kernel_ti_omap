@@ -165,6 +165,10 @@ static struct twl4030_keypad_data latona_kp_twl4030_data = {
 
 static struct __initdata twl4030_power_data latona_t2scripts_data;
 
+static struct regulator_consumer_supply latona_vdda_dac_supply = {
+	.supply = "vdda_dac",
+	
+};
 static struct regulator_consumer_supply latona_vmmc1_supply = {
 	.supply		= "vmmc",
 };
@@ -176,7 +180,35 @@ static struct regulator_consumer_supply latona_vsim_supply = {
 static struct regulator_consumer_supply latona_vmmc2_supply = {
 	.supply		= "vmmc",
 };
+static struct regulator_consumer_supply latona_vaux1_supply = {
+	.supply = "vaux1",
+};
 
+static struct regulator_consumer_supply latona_vaux2_supply = {
+	.supply = "vaux2",
+};
+
+static struct regulator_consumer_supply latona_vaux3_supply = {
+	.supply = "vaux3",
+};
+
+static struct regulator_consumer_supply latona_vaux4_supply = {
+	.supply = "vaux4",
+};
+
+static struct regulator_consumer_supply latona_vpll2_supply = {
+	.supply = "vpll2",
+};
+struct regulator_init_data latona_vdac = {
+	.constraints = {
+			.min_uV = 1800000,
+			.max_uV = 1800000,
+			.valid_modes_mask = REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
+			.valid_ops_mask = REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
+			},
+	.num_consumer_supplies = 1,
+	.consumer_supplies = &latona_vdda_dac_supply,
+};
 /* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
 static struct regulator_init_data latona_vmmc1 = {
 	.constraints = {
@@ -206,6 +238,36 @@ static struct regulator_init_data latona_vmmc2 = {
 	.num_consumer_supplies  = 1,
 	.consumer_supplies      = &latona_vmmc2_supply,
 };
+
+
+/* VAUX1 for PL_SENSOR */
+static struct regulator_init_data latona_aux1 = {
+	.constraints = {
+			.min_uV = 3000000,
+			.max_uV = 3000000,
+			.valid_modes_mask = REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
+			.valid_ops_mask = REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
+			},
+	.num_consumer_supplies = 1,
+	.consumer_supplies = &latona_vaux1_supply,
+};
+
+/* VAUX2 for PL_SENSOR */
+static struct regulator_init_data latona_aux2 = {
+	.constraints = {
+			.min_uV = 2800000,
+			.max_uV = 2800000,
+			.apply_uV = true,
+    #if 1  //TI patch to avoid leakage current in U404 chip(AP_SCL voltage correction for sensor )
+			.always_on = true,
+    #endif 
+			.valid_modes_mask = REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
+			.valid_ops_mask = REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
+			},
+	.num_consumer_supplies = 1,
+	.consumer_supplies = &latona_vaux2_supply,
+};
+
 
 /* VSIM for OMAP VDD_MMC1A (i/o for DAT4..DAT7) */
 static struct regulator_init_data latona_vsim = {
@@ -472,9 +534,13 @@ static struct twl4030_platform_data latona_twldata = {
 	.keypad		= &latona_kp_twl4030_data,
 	.power		= &latona_t2scripts_data,
 	.codec		= &latona_codec_data,
-	.vmmc1          = &latona_vmmc1,
-	.vmmc2          = &latona_vmmc2,
-	.vsim           = &latona_vsim,
+	.vmmc1      = &latona_vmmc1,
+	.vmmc2      = &latona_vmmc2,
+	.vsim       = &latona_vsim,
+    .vaux1      = &latona_aux1,
+	.vaux2      = &latona_aux2,
+	.vaux3      = &latona_aux3,
+	.vaux4      = &latona_aux4,
 	.vpll2		= &latona_vpll2,
 	.vdac		= &latona_vdac,
 
