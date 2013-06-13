@@ -28,13 +28,13 @@
 #include <plat/timer-gp.h>
 
 #include "mux.h"
-#include "sdram-hynix-h8mbx00u0mer-0em.h"
+#include "sdram-qimonda-hyb18m512160af-6.h"
 #include "smartreflex-class1p5.h"
-#include "board-zoom2-wifi.h"
+#include "board-latona-wifi.h"
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
 
-#define McBSP3_BT_GPIO 164
+#define LATONA_McBSP3_BT_GPIO 164
 
 #ifdef CONFIG_PM
 static struct omap_volt_vc_data vc_config = {
@@ -99,20 +99,20 @@ static struct omap_volt_pmic_info omap_pmic_core = {
 #endif /* CONFIG_TWL4030_CORE */
 #endif /* CONFIG_PM */
 
-static void __init omap_zoom_map_io(void)
+static void __init omap_latona_map_io(void)
 {
 	omap2_set_globals_36xx();
 	omap34xx_map_common_io();
 }
 
-static struct omap_board_config_kernel zoom_config[] __initdata = {
+static struct omap_board_config_kernel latona_config[] __initdata = {
 };
 
 /*
  * Note! The addresses which appear in this table must agree with the
  * addresses in the U-Boot environment variables.
  */
-static struct mtd_partition zoom_nand_partitions[] = {
+static struct mtd_partition latona_nand_partitions[] = {
 	/* All the partition sizes are listed in terms of NAND block size */
 	{
 		.name           = "X-Loader-NAND",
@@ -155,19 +155,19 @@ static struct mtd_partition zoom_nand_partitions[] = {
 #endif
 };
 
-static struct flash_partitions zoom_flash_partitions[] = {
+static struct flash_partitions latona_flash_partitions[] = {
 	{
-		.parts = zoom_nand_partitions,
-		.nr_parts = ARRAY_SIZE(zoom_nand_partitions),
+		.parts = latona_nand_partitions,
+		.nr_parts = ARRAY_SIZE(latona_nand_partitions),
 	},
 };
 
-static void __init omap_zoom_init_irq(void)
+static void __init omap_latona_init_irq(void)
 {
-	omap_board_config = zoom_config;
-	omap_board_config_size = ARRAY_SIZE(zoom_config);
-	omap2_init_common_hw(h8mbx00u0mer0em_sdrc_params,
-			h8mbx00u0mer0em_sdrc_params);
+	omap_board_config = latona_config;
+	omap_board_config_size = ARRAY_SIZE(latona_config);
+	omap2_init_common_devices(hyb18m512160af6_sdrc_params,
+		hyb18m512160af6_sdrc_params);
 	omap2_gp_clockevent_set_gptimer(1);
 	omap_init_irq();
 }
@@ -220,7 +220,7 @@ static struct platform_device btwilink_device = {
 	.id = -1,
 };
 
-static struct platform_device *zoom_devices[] __initdata = {
+static struct platform_device *latona_devices[] __initdata = {
 
 	&wl127x_device,
 	&btwilink_device,
@@ -280,20 +280,20 @@ fail:
 
 
 
-static void __init omap_zoom_init(void)
+static void __init omap_latona_init(void)
 {
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
 	config_wlan_mux();
 
-	zoom_peripherals_init();
-	zoom_flash_init(zoom_flash_partitions, ZOOM_NAND_CS);
-	zoom_debugboard_init();
-	zoom_display_init(OMAP_DSS_VENC_TYPE_COMPOSITE);
+	latona_peripherals_init();
+	latona_flash_init(latona_flash_partitions, LATONA_NAND_CS);
+	latona_debugboard_init();
+	latona_display_init(OMAP_DSS_VENC_TYPE_COMPOSITE);
 
 	omap_mux_init_gpio(64, OMAP_PIN_OUTPUT);
 	omap_mux_init_gpio(109, OMAP_PIN_OUTPUT);
 	omap_mux_init_gpio(161, OMAP_PIN_OUTPUT);
-	omap_mux_init_gpio(McBSP3_BT_GPIO, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(LATONA_McBSP3_BT_GPIO, OMAP_PIN_OUTPUT);
 	usb_uhhtll_init(&usbhs_pdata);
 	sr_class1p5_init();
 
@@ -304,12 +304,12 @@ static void __init omap_zoom_init(void)
 #endif
 	omap_voltage_init_vc(&vc_config);
 #endif
-	platform_add_devices(zoom_devices, ARRAY_SIZE(zoom_devices));
+	platform_add_devices(latona_devices, ARRAY_SIZE(latona_devices));
 	wl127x_vio_leakage_fix();
 }
 
 /* must be called after omap2_common_pm_init() */
-static int __init zoom3_opp_init(void)
+static int __init latona_opp_init(void)
 {
 	struct omap_hwmod *mh, *dh;
 	struct omap_opp *mopp, *dopp;
@@ -386,14 +386,14 @@ static int __init zoom3_opp_init(void)
 
 	return 0;
 }
-device_initcall(zoom3_opp_init);
+device_initcall(latona_opp_init);
 
 MACHINE_START(LATONA, "SAMSUNG LATONA")
 	.phys_io	= 0x48000000,
 	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,
-	.map_io		= omap_zoom_map_io,
-	.init_irq	= omap_zoom_init_irq,
-	.init_machine	= omap_zoom_init,
+	.map_io		= omap_latona_map_io,
+	.init_irq	= omap_latona_init_irq,
+	.init_machine	= omap_latona_init,
 	.timer		= &omap_timer,
 MACHINE_END

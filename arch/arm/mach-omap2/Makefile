@@ -184,7 +184,8 @@ obj-$(CONFIG_MACH_OMAP_LATONA)		+= board-latona.o \
 					   board-latona-peripherals.o \
 					   board-latona-camera.o \
 					   board-latona-display.o \
-					   hsmmc.o
+					   hsmmc.o \
+					   mux_latona_rev_r08.o
 obj-$(CONFIG_MACH_OMAP_3630SDP)		+= board-3630sdp.o \
 					   board-zoom-peripherals.o \
 					   board-zoom2-camera.o \
