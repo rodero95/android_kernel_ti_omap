@@ -111,8 +111,44 @@ static struct twl4030_keypad_data latona_kp_twl4030_data = {
 	.rep = 0,
 };
 
-static struct __initdata twl4030_power_data latona_t2scripts_data;
+static struct resource board_power_key_resources[] = {
+	[0] = {
+	       // PWRON KEY
+	       .start = 0,
+	       .end = 0,
+	       .flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL,
+	       },
+	[1] = {
+	       // HOME KEY
+	       .start = 0,
+	       .end = 0,
+	       .flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL,
+	       },
 
+};
+
+static struct platform_device board_power_key_device = {
+	.name = "power_key_device",
+	.id = -1,
+	.num_resources = ARRAY_SIZE(board_power_key_resources),
+	.resource = board_power_key_resources,
+};
+
+
+static struct __initdata twl4030_power_data latona_t2scripts_data;
+#ifdef CONFIG_INPUT_ZEUS_EAR_KEY
+static struct resource board_ear_key_resource = {
+	.start = 0,
+	.end = 0,
+	.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL,
+};
+static struct platform_device board_ear_key_device = {
+	.name = "sec_jack",
+	.id = -1,
+	.num_resources = 1,
+	.resource = &board_ear_key_resource,
+};
+#endif
 static struct regulator_consumer_supply latona_vdda_dac_supply = {
 	.supply = "vdda_dac",
 	
@@ -233,16 +269,15 @@ static struct regulator_init_data latona_vsim = {
 };
 
 static struct gpio_switch_platform_data headset_switch_data = {
-	.name		= "h2w",
-	.gpio		= OMAP_MAX_GPIO_LINES + 2, /* TWL4030 GPIO_2 */
+	.name = "h2w",
+	.gpio = OMAP_GPIO_DET_3_5,	/* Omap3430 GPIO_27 For samsung zeus */
 };
 
 static struct platform_device headset_switch_device = {
-	.name		= "switch-gpio",
-	.id		= -1,
-	.dev		= {
+	.name = "switch-gpio",
+	.dev = {
 		.platform_data = &headset_switch_data,
-	}
+		}
 };
 
 #ifdef CONFIG_LEDS_OMAP_DISPLAY
@@ -332,6 +367,10 @@ static struct platform_device *latona_board_devices[] __initdata = {
 #ifdef CONFIG_LEDS_OMAP_DISPLAY
 	&omap_disp_led,
 #endif
+#ifdef CONFIG_INPUT_ZEUS_EAR_KEY
+	&board_ear_key_device,
+#endif
+	&board_power_key_device,
 };
 
 static struct omap2_hsmmc_info mmc[] __initdata = {
@@ -503,6 +542,41 @@ static struct i2c_board_info __initdata latona_i2c_boardinfo[] = {
 	},
 };
 
+#ifdef CONFIG_INPUT_ZEUS_EAR_KEY
+static inline void __init board_init_ear_key(void)
+{
+	board_ear_key_resource.start = gpio_to_irq(OMAP_GPIO_EAR_SEND_END);
+	if (gpio_request(OMAP_GPIO_EAR_SEND_END, "ear_key_irq") < 0) {
+		printk(KERN_ERR
+		       "\n FAILED TO REQUEST GPIO %d for POWER KEY IRQ \n",
+		       OMAP_GPIO_EAR_SEND_END);
+		return;
+	}
+	gpio_direction_input(OMAP_GPIO_EAR_SEND_END);
+}
+#endif
+
+static inline void __init board_init_power_key(void)
+{
+	board_power_key_resources[0].start = gpio_to_irq(OMAP_GPIO_KEY_PWRON);
+	if (gpio_request(OMAP_GPIO_KEY_PWRON, "power_key_irq") < 0) {
+		printk(KERN_ERR
+		       "\n FAILED TO REQUEST GPIO %d for POWER KEY IRQ \n",
+		       OMAP_GPIO_KEY_PWRON);
+		return;
+	}
+	board_power_key_resources[1].start = gpio_to_irq(OMAP_GPIO_KEY_HOME);
+	if (gpio_request(OMAP_GPIO_KEY_HOME, "home_key_irq") < 0) {
+		printk(KERN_ERR
+		       "\n FAILED TO REQUEST GPIO %d for VOLDN KEY IRQ \n",
+		       OMAP_GPIO_KEY_HOME);
+		return;
+	}
+	gpio_direction_input(OMAP_GPIO_KEY_PWRON);
+	gpio_direction_input(OMAP_GPIO_KEY_HOME);
+}
+
+
 static void atmel_dev_init(void)
 {
 	/* Set the ts_gpio pin mux */
@@ -641,6 +715,10 @@ void __init latona_peripherals_init(void)
 	atmel_dev_init();
 	omap_serial_init(omap_serial_platform_data);
 	usb_musb_init(&musb_board_data);
+	board_init_power_key();
 	enable_board_wakeup_source();
 	latona_cam_init();
+#ifdef CONFIG_INPUT_ZEUS_EAR_KEY
+	board_init_ear_key();
+#endif
 }
