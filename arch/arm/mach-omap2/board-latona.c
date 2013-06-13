@@ -17,6 +17,8 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/delay.h>
+#include <asm/setup.h>
+#include <asm/sizes.h>
 
 #include <mach/board-latona.h>
 
@@ -308,6 +310,21 @@ static void __init omap_latona_init(void)
 	wl127x_vio_leakage_fix();
 }
 
+static void __init omap_latona_fixup(struct machine_desc *desc,
+				    struct tag *tags, char **cmdline,
+				    struct meminfo *mi)
+{
+	mi->bank[0].start = 0x80000000;
+	mi->bank[0].size = 256 * SZ_1M;	/* DDR_CS0 256MB */
+	mi->bank[0].node = 0;
+
+	mi->bank[1].start = 0x90000000;
+	mi->bank[1].size = 256 * SZ_1M;	/* DDR_CS1 256MB */
+	mi->bank[1].node = 0;
+
+	mi->nr_banks = 2;
+}
+
 /* must be called after omap2_common_pm_init() */
 static int __init latona_opp_init(void)
 {
@@ -392,6 +409,7 @@ MACHINE_START(LATONA, "SAMSUNG LATONA")
 	.phys_io	= 0x48000000,
 	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,
+	.fixup		= omap_latona_fixup,
 	.map_io		= omap_latona_map_io,
 	.init_irq	= omap_latona_init_irq,
 	.init_machine	= omap_latona_init,
