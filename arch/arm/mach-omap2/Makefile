@@ -180,12 +180,11 @@ obj-$(CONFIG_MACH_OMAP_ZOOM3)		+= board-zoom3.o \
 					   hsmmc.o \
 					   board-zoom-debugboard.o
 obj-$(CONFIG_MACH_OMAP_LATONA)		+= board-latona.o \
-					   board-zoom-flash.o \
-					   board-zoom-peripherals.o \
-					   board-zoom2-camera.o \
-					   board-zoom-display.o \
-					   hsmmc.o \
-					   board-zoom-debugboard.o
+					   board-latona-flash.o \
+					   board-latona-peripherals.o \
+					   board-latona-camera.o \
+					   board-latona-display.o \
+					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP_3630SDP)		+= board-3630sdp.o \
 					   board-zoom-peripherals.o \
 					   board-zoom2-camera.o \
