@@ -18,7 +18,7 @@
 #include <asm/mach/arch.h>
 #include <asm/delay.h>
 
-#include <mach/board-zoom.h>
+#include <mach/board-latona.h>
 
 #include <plat/common.h>
 #include <plat/control.h>
@@ -388,9 +388,9 @@ static int __init zoom3_opp_init(void)
 }
 device_initcall(zoom3_opp_init);
 
-MACHINE_START(OMAP_ZOOM3, "OMAP3630 Zoom3 board")
-	.phys_io	= ZOOM_UART_BASE,
-	.io_pg_offst	= (ZOOM_UART_VIRT >> 18) & 0xfffc,
+MACHINE_START(LATONA, "SAMSUNG LATONA")
+	.phys_io	= 0x48000000,
+	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,
 	.map_io		= omap_zoom_map_io,
 	.init_irq	= omap_zoom_init_irq,
