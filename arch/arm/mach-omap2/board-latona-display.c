@@ -25,69 +25,16 @@
 #include <plat/omap-pm.h>
 #include "mux.h"
 
-#ifdef CONFIG_PANEL_SIL9022
-#include <mach/sil9022.h>
-#endif
-
 #define LCD_PANEL_ENABLE_GPIO		(7 + OMAP_MAX_GPIO_LINES)
 #define LCD_PANEL_RESET_GPIO_PROD	96
 #define LCD_PANEL_RESET_GPIO_PILOT	55
-#define LCD_PANEL_QVGA_GPIO		56
-#define TV_PANEL_ENABLE_GPIO		95
-#define SIL9022_RESET_GPIO              97
+#define LCD_PANEL_QVGA_GPIO			56
 
 int omap_mux_init_signal(const char *muxname, int val);
 
 struct latona_dss_board_info {
 	int gpio_flag;
 };
-
-static void latona_lcd_tv_panel_init(void)
-{
-	int ret;
-	unsigned char lcd_panel_reset_gpio;
-
-	if (omap_rev() > OMAP3430_REV_ES3_0) {
-		/* Production Zoom2 board:
-		 * GPIO-96 is the LCD_RESET_GPIO
-		 */
-		lcd_panel_reset_gpio = LCD_PANEL_RESET_GPIO_PROD;
-	} else {
-		/* Pilot Zoom2 board:
-		 * GPIO-55 is the LCD_RESET_GPIO
-		 */
-		lcd_panel_reset_gpio = LCD_PANEL_RESET_GPIO_PILOT;
-	}
-
-	ret = gpio_request(lcd_panel_reset_gpio, "lcd reset");
-	if (ret) {
-		pr_err("Failed to get LCD reset GPIO.\n");
-		return;
-	}
-	gpio_direction_output(lcd_panel_reset_gpio, 1);
-
-	ret = gpio_request(LCD_PANEL_QVGA_GPIO, "lcd qvga");
-	if (ret) {
-		pr_err("Failed to get LCD_PANEL_QVGA_GPIO.\n");
-		goto err0;
-	}
-	gpio_direction_output(LCD_PANEL_QVGA_GPIO, 1);
-
-	ret = gpio_request(TV_PANEL_ENABLE_GPIO, "tv panel");
-	if (ret) {
-		pr_err("Failed to get TV_PANEL_ENABLE_GPIO.\n");
-		goto err1;
-	}
-	gpio_direction_output(TV_PANEL_ENABLE_GPIO, 0);
-
-	return;
-
-err1:
-	gpio_free(LCD_PANEL_QVGA_GPIO);
-err0:
-	gpio_free(lcd_panel_reset_gpio);
-
-}
 
 static int latona_panel_power_enable(int enable)
 {
@@ -160,115 +107,24 @@ static void latona_panel_disable_lcd(struct omap_dss_device *dssdev)
 	gpio_set_value(LCD_PANEL_ENABLE_GPIO, 0);
 }
 
-static int latona_panel_enable_tv(struct omap_dss_device *dssdev)
-{
-	int ret;
-	struct regulator *vdac_reg;
-
-	vdac_reg = regulator_get(NULL, "vdda_dac");
-	if (IS_ERR(vdac_reg)) {
-		pr_err("Unable to get vdac regulator\n");
-		return PTR_ERR(vdac_reg);
-	}
-	ret = regulator_enable(vdac_reg);
-	if (ret < 0)
-		return ret;
-	gpio_set_value(TV_PANEL_ENABLE_GPIO, 0);
-
-	return 0;
-}
-
-static void latona_panel_disable_tv(struct omap_dss_device *dssdev)
-{
-	struct regulator *vdac_reg;
-
-	vdac_reg = regulator_get(NULL, "vdda_dac");
-	if (IS_ERR(vdac_reg)) {
-		pr_err("Unable to get vpll2 regulator\n");
-		return;
-	}
-	regulator_disable(vdac_reg);
-	gpio_set_value(TV_PANEL_ENABLE_GPIO, 1);
-}
-
 static struct latona_dss_board_info latona_dss_lcd_data = {
 	.gpio_flag = 0,
 };
 
 static struct omap_dss_device latona_lcd_device = {
 	.name = "lcd",
-	.driver_name = "NEC_8048_panel",
+	.driver_name = "nt35510_panel",
 	.type = OMAP_DISPLAY_TYPE_DPI,
 	.phy.dpi.data_lines = 24,
-	.platform_enable = latona_panel_enable_lcd,
-	.platform_disable = latona_panel_disable_lcd,
+	.platform_enable = NULL,
+	.platform_disable = NULL,
 	.dev = {
 		.platform_data = &latona_dss_lcd_data,
 	},
 };
 
-static struct omap_dss_device latona_tv_device = {
-	.name                   = "tv",
-	.driver_name            = "venc",
-	.type                   = OMAP_DISPLAY_TYPE_VENC,
-	.phy.venc.type          = -1,
-	.platform_enable        = latona_panel_enable_tv,
-	.platform_disable       = latona_panel_disable_tv,
-};
-
-#ifdef CONFIG_PANEL_SIL9022
-void config_hdmi_gpio(void)
-{
-	/* HDMI_RESET uses CAM_PCLK mode 4*/
-	omap_mux_init_signal("gpio_97", OMAP_PIN_INPUT_PULLUP);
-}
-
-void latona_hdmi_reset_enable(int level)
-{
-	/* Set GPIO_97 to high to pull SiI9022 HDMI transmitter out of reset
-	* and low to disable it.
-	*/
-	gpio_request(SIL9022_RESET_GPIO, "hdmi reset");
-	gpio_direction_output(SIL9022_RESET_GPIO, level);
-}
-
-static int latona_panel_enable_hdmi(struct omap_dss_device *dssdev)
-{
-	latona_hdmi_reset_enable(1);
-	return 0;
-}
-
-static void latona_panel_disable_hdmi(struct omap_dss_device *dssdev)
-{
-	latona_hdmi_reset_enable(0);
-}
-
-struct hdmi_platform_data latona_hdmi_data = {
-#ifdef CONFIG_PM
-	.set_min_bus_tput = omap_pm_set_min_bus_tput,
-	.set_max_mpu_wakeup_lat =  omap_pm_set_max_mpu_wakeup_lat,
-#endif
-};
-
-static struct omap_dss_device latona_hdmi_device = {
-	.name = "hdmi",
-	.driver_name = "hdmi_panel",
-	.type = OMAP_DISPLAY_TYPE_DPI,
-	.phy.dpi.data_lines = 24,
-	.platform_enable = latona_panel_enable_hdmi,
-	.platform_disable = latona_panel_disable_hdmi,
-	.dev = {
-		.platform_data = &latona_hdmi_data,
-	},
-};
-#endif
-
-
 static struct omap_dss_device *latona_dss_devices[] = {
 	&latona_lcd_device,
-#ifdef CONFIG_PANEL_SIL9022
-	&latona_hdmi_device,
-#endif
 	&latona_tv_device,
 };
 
@@ -283,11 +139,11 @@ static struct omap2_mcspi_device_config dss_lcd_mcspi_config = {
 	.single_channel         = 1,  /* 0: slave, 1: master */
 };
 
-static struct spi_board_info nec_8048_spi_board_info[] __initdata = {
+static struct spi_board_info nt35510_spi_board_info[] __initdata = {
 	[0] = {
-		.modalias               = "nec_8048_spi",
+		.modalias               = "nt35510_spi",
 		.bus_num                = 1,
-		.chip_select            = 2,
+		.chip_select            = 0,
 		.max_speed_hz           = 375000,
 		.controller_data        = &dss_lcd_mcspi_config,
 	},
@@ -295,10 +151,8 @@ static struct spi_board_info nec_8048_spi_board_info[] __initdata = {
 
 void __init latona_display_init(enum omap_dss_venc_type venc_type)
 {
-	latona_tv_device.phy.venc.type = venc_type;
 	omap_display_init(&latona_dss_data);
-	spi_register_board_info(nec_8048_spi_board_info,
-				ARRAY_SIZE(nec_8048_spi_board_info));
-	latona_lcd_tv_panel_init();
+	spi_register_board_info(nt35510_spi_board_info,
+				ARRAY_SIZE(nt35510_spi_board_info));
 }
 
