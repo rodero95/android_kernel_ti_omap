@@ -36,10 +36,6 @@
 #include <linux/leds-omap-display.h>
 #endif
 
-#ifdef CONFIG_PANEL_SIL9022
-#include <mach/sil9022.h>
-#endif
-
 #include <mach/board-latona.h>
 
 #include "mux.h"
@@ -535,14 +531,6 @@ static struct i2c_board_info __initdata latona_i2c_bus2_info[] = {
 #endif
 };
 
-static struct i2c_board_info __initdata latona_i2c_bus3_info[] = {
-#ifdef CONFIG_PANEL_SIL9022
-	{
-		I2C_BOARD_INFO(SIL9022_DRV_NAME, SI9022_I2CSLAVEADDRESS),
-	},
-#endif
-};
-
 static int __init omap_i2c_init(void)
 {
 	/* Disable OMAP 3630 internal pull-ups for I2Ci */
@@ -655,8 +643,4 @@ void __init latona_peripherals_init(void)
 	usb_musb_init(&musb_board_data);
 	enable_board_wakeup_source();
 	latona_cam_init();
-#ifdef CONFIG_PANEL_SIL9022
-	config_hdmi_gpio();
-	latona_hdmi_reset_enable(1);
-#endif
 }
