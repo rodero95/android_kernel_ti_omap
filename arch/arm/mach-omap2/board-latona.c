@@ -38,6 +38,14 @@
 
 #define LATONA_McBSP3_BT_GPIO 164
 
+#ifdef CONFIG_OMAP_MUX
+extern struct omap_board_mux *latona_board_mux_ptr;
+extern struct omap_board_mux *latona_board_wk_mux_ptr;
+#else
+#define latona_board_mux_ptr		NULL
+#define latona_board_wk_mux_ptr		NULL
+#endif
+
 #ifdef CONFIG_PM
 static struct omap_volt_vc_data vc_config = {
 	/* MPU */
@@ -174,14 +182,6 @@ static void __init omap_latona_init_irq(void)
 	omap_init_irq();
 }
 
-#ifdef CONFIG_OMAP_MUX
-static struct omap_board_mux board_mux[] __initdata = {
-	{ .reg_offset = OMAP_MUX_TERMINATOR },
-};
-#else
-#define board_mux	NULL
-#endif
-
 static const struct usbhs_omap_platform_data usbhs_pdata __initconst = {
 	.port_mode[0]		= OMAP_USBHS_PORT_MODE_UNUSED,
 	.port_mode[1]		= OMAP_EHCI_PORT_MODE_PHY,
@@ -284,7 +284,9 @@ fail:
 
 static void __init omap_latona_init(void)
 {
-	omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
+	omap3_mux_init(latona_board_mux_ptr, OMAP_PACKAGE_CBP);
+	sec_mux_init_gpio_out();
+	sec_mux_set_wakeup_gpio();
 	config_wlan_mux();
 
 	latona_peripherals_init();
