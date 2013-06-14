@@ -612,22 +612,66 @@ static void atmel_dev_init(void)
 }
 
 static struct i2c_board_info __initdata latona_i2c_bus2_info[] = {
-#if (defined(CONFIG_VIDEO_IMX046) || defined(CONFIG_VIDEO_IMX046_MODULE)) && \
-	defined(CONFIG_VIDEO_OMAP3)
+#if 1
+#if defined(CONFIG_FSA9480_MICROUSB)
 	{
-		I2C_BOARD_INFO(IMX046_NAME, IMX046_I2C_ADDR),
-		.platform_data = &latona_imx046_platform_data,
+		I2C_BOARD_INFO("fsa9480", 0x25),
+		.flags = I2C_CLIENT_WAKE,
+		.irq = OMAP_GPIO_IRQ(OMAP_GPIO_JACK_NINT),
+	},
+#elif defined(CONFIG_MICROUSBIC_INTR)
+	{
+		I2C_BOARD_INFO("microusbic", 0x25),
 	},
 #endif
-#if (defined(CONFIG_VIDEO_LV8093) || defined(CONFIG_VIDEO_LV8093_MODULE)) && \
-	defined(CONFIG_VIDEO_OMAP3)
-	{
-		I2C_BOARD_INFO(LV8093_NAME,  LV8093_AF_I2C_ADDR),
-		.platform_data = &latona_lv8093_platform_data,
-	},
-#endif
-};
 
+#if defined(CONFIG_SND_SOC_MAX9877)
+	{
+		I2C_BOARD_INFO("max9877", 0x4d),
+	},
+#elif defined(CONFIG_SND_SOC_MAX97000)
+	{
+		I2C_BOARD_INFO("max97000", 0x4d),
+	},
+#endif
+	{
+		I2C_BOARD_INFO(CE147_DRIVER_NAME, CE147_I2C_ADDR),
+		.platform_data = &omap_board_ce147_platform_data,
+	},
+	{
+		I2C_BOARD_INFO(S5KA3DFX_DRIVER_NAME, S5KA3DFX_I2C_ADDR),
+		.platform_data = &omap_board_s5ka3dfx_platform_data,
+	},
+	{
+		I2C_BOARD_INFO("cam_pmic", CAM_PMIC_I2C_ADDR),
+	},
+	{
+		I2C_BOARD_INFO("secFuelgaugeDev", 0x36),
+		.flags = I2C_CLIENT_WAKE,
+		.irq = OMAP_GPIO_IRQ(OMAP_GPIO_FUEL_INT_N),
+	},
+#endif	
+#if !defined(CONFIG_INPUT_GP2A_USE_GPIO_I2C)
+	{
+		I2C_BOARD_INFO("gp2a", 0x44),
+	},
+#endif
+#if !defined(CONFIG_INPUT_YAS529_USE_GPIO_I2C)
+	{
+		I2C_BOARD_INFO("geomagnetic", 0x2E),
+	},
+#endif
+
+	{
+		I2C_BOARD_INFO("Si4709_driver", 0x10),			
+	},};
+
+static struct i2c_board_info __initdata latona_i2c_bus3_info[] = {
+   {
+    I2C_BOARD_INFO("qt602240_ts", 0x4A),
+   },
+ };
+	
 static int __init omap_i2c_init(void)
 {
 	/* Disable OMAP 3630 internal pull-ups for I2Ci */
@@ -653,10 +697,11 @@ static int __init omap_i2c_init(void)
 		omap_ctrl_writel(prog_io, OMAP36XX_CONTROL_PROG_IO_WKUP1);
 	}
 
-	omap_register_i2c_bus(1, 100, NULL, latona_i2c_boardinfo,
-			ARRAY_SIZE(latona_i2c_boardinfo));
-	omap_register_i2c_bus(2, 100, NULL, latona_i2c_bus2_info,
+
+	omap_register_i2c_bus(2, 400, NULL, latona_i2c_bus2_info,
 			ARRAY_SIZE(latona_i2c_bus2_info));
+	omap_register_i2c_bus(1, 400, NULL, latona_i2c_boardinfo,
+			ARRAY_SIZE(latona_i2c_boardinfo));
 	omap_register_i2c_bus(3, 400, NULL, latona_i2c_bus3_info,
 			ARRAY_SIZE(latona_i2c_bus3_info));
 	return 0;
