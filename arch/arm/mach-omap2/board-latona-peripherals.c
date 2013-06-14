@@ -439,8 +439,9 @@ static int latona_twl_gpio_setup(struct device *dev,
 		unsigned gpio, unsigned ngpio)
 {
 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
-	mmc[0].gpio_cd = gpio + 0;
+	//mmc[0].gpio_cd = gpio + 0;
 
+	 mmc[1].gpio_cd = 23;
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
 	/* The controller that is connected to the 128x device
 	 * should have the card detect gpio disabled. This is
