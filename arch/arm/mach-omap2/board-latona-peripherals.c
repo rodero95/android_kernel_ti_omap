@@ -17,6 +17,7 @@
 #include <linux/i2c/twl.h>
 #include <linux/regulator/machine.h>
 #include <linux/mmc/host.h>
+#include <linux/leds.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -32,7 +33,6 @@
 #include <linux/switch.h>
 
 #ifdef CONFIG_LEDS_OMAP_DISPLAY
-#include <linux/leds.h>
 #include <linux/leds-omap-display.h>
 #endif
 
@@ -133,6 +133,7 @@ static struct platform_device board_power_key_device = {
 	.num_resources = ARRAY_SIZE(board_power_key_resources),
 	.resource = board_power_key_resources,
 };
+
 
 
 static struct __initdata twl4030_power_data latona_t2scripts_data;
@@ -371,6 +372,7 @@ static struct platform_device *latona_board_devices[] __initdata = {
 	&board_ear_key_device,
 #endif
 	&board_power_key_device,
+	&samsung_led_device,
 };
 
 static struct omap2_hsmmc_info mmc[] __initdata = {
@@ -575,6 +577,26 @@ static inline void __init board_init_power_key(void)
 	gpio_direction_input(OMAP_GPIO_KEY_PWRON);
 	gpio_direction_input(OMAP_GPIO_KEY_HOME);
 }
+
+static struct led_info sec_keyled_list[] = {
+	{
+	 .name = "button-backlight",
+	 },
+};
+
+static struct led_platform_data sec_keyled_data = {
+	.num_leds = ARRAY_SIZE(sec_keyled_list),
+	.leds = sec_keyled_list,
+};
+
+static struct platform_device samsung_led_device = {
+	.name = "secLedDriver",
+	.id = -1,
+	.num_resources = 0,
+	.dev = {
+		.platform_data = &sec_keyled_data,
+		},
+};
 
 
 static void atmel_dev_init(void)
