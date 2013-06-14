@@ -118,60 +118,6 @@ static void __init omap_latona_map_io(void)
 static struct omap_board_config_kernel latona_config[] __initdata = {
 };
 
-/*
- * Note! The addresses which appear in this table must agree with the
- * addresses in the U-Boot environment variables.
- */
-static struct mtd_partition latona_nand_partitions[] = {
-	/* All the partition sizes are listed in terms of NAND block size */
-	{
-		.name           = "X-Loader-NAND",
-		.offset         = 0,
-		.size           = 4 * (64 * 2048),
-		.mask_flags     = MTD_WRITEABLE,        /* force read-only */
-	},
-	{
-		.name           = "U-Boot-NAND",
-		.offset         = 0x0080000,
-		.size           = 0x0180000, /* 1.5 M */
-		.mask_flags     = MTD_WRITEABLE,        /* force read-only */
-	},
-	{
-		.name           = "Boot Env-NAND",
-		.offset         = 0x01C0000,
-		.size           = 0x0040000,
-	},
-	{
-		.name           = "Kernel-NAND",
-		.offset         = 0x0200000,
-		.size           = 0x1C00000,   /* 30M */
-	},
-#ifdef CONFIG_ANDROID
-	{
-		.name           = "system",
-		.offset         = 0x2000000,
-		.size           = 0xB400000,   /* 180M */
-	},
-	{
-		.name           = "userdata",
-		.offset         = 0xD400000,
-		.size           = 0x4000000,    /* 64M */
-	},
-	{
-		.name           = "cache",
-		.offset         = 0x11400000,
-		.size           = 0x2000000,    /* 32M */
-	},
-#endif
-};
-
-static struct flash_partitions latona_flash_partitions[] = {
-	{
-		.parts = latona_nand_partitions,
-		.nr_parts = ARRAY_SIZE(latona_nand_partitions),
-	},
-};
-
 static void __init omap_latona_init_irq(void)
 {
 	omap_board_config = latona_config;
@@ -290,8 +236,7 @@ static void __init omap_latona_init(void)
 	config_wlan_mux();
 
 	latona_peripherals_init();
-	latona_flash_init(latona_flash_partitions, LATONA_NAND_CS);
-	latona_debugboard_init();
+	latona_onenand_init();
 	latona_display_init(OMAP_DSS_VENC_TYPE_COMPOSITE);
 
 	omap_mux_init_gpio(64, OMAP_PIN_OUTPUT);

@@ -25,37 +25,16 @@
 
 #include <mach/board-latona.h>
 
-#if defined(CONFIG_MTD_NAND_OMAP2) || \
-		defined(CONFIG_MTD_NAND_OMAP2_MODULE)
-/* NAND chip access: 16 bit */
-static struct omap_nand_platform_data latona_nand_data = {
-	.nand_setup	= NULL,
-	.dma_channel	= -1,	/* disable DMA in OMAP NAND driver */
-	.dev_ready	= NULL,
-	.devsize	= 1,	/* '0' for 8-bit, '1' for 16-bit device */
+static struct omap_onenand_platform_data latona_onenand_data = {
+  .cs    = 0,
+  .gpio_irq  = 73,
+  .parts    = onenand_partitions,
+  .nr_parts  = ARRAY_SIZE(onenand_partitions),
+  .flags    = ONENAND_SYNC_READWRITE,
 };
 
-/**
- * zoom_flash_init - Identify devices connected to GPMC and register.
- *
- * @return - void.
- */
-void __init latona_flash_init(struct flash_partitions latona_nand_parts[], int cs)
+static void __init latona_onenand_init(void)
 {
-	u32 gpmc_base_add = OMAP34XX_GPMC_VIRT;
+  gpmc_onenand_init(&latona_onenand_data);
+}
 
-	latona_nand_data.cs		= cs;
-	latona_nand_data.parts		= latona_nand_parts[0].parts;
-	latona_nand_data.nr_parts		= latona_nand_parts[0].nr_parts;
-	latona_nand_data.ecc_opt		= 0x2; /* HW ECC in romcode layout */
-	latona_nand_data.gpmc_baseaddr	= (void *)(gpmc_base_add);
-	latona_nand_data.gpmc_cs_baseaddr	= (void *)(gpmc_base_add +
-						GPMC_CS0_BASE +
-						cs * GPMC_CS_SIZE);
-	gpmc_nand_init(&latona_nand_data);
-}
-#else
-void __init latona_flash_init(struct flash_partitions latona_nand_parts[], int cs)
-{
-}
-#endif /* CONFIG_MTD_NAND_OMAP2 || CONFIG_MTD_NAND_OMAP2_MODULE */

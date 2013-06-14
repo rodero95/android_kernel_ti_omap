@@ -709,7 +709,7 @@ static int __init omap_i2c_init(void)
 
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type		= MUSB_INTERFACE_ULPI,
-	.mode			= MUSB_OTG,
+	.mode			= MUSB_PERIPHERAL,
 	.power			= 100,
 };
 
