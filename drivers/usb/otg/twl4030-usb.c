@@ -39,6 +39,29 @@
 #include <linux/err.h>
 #include <linux/notifier.h>
 #include <linux/slab.h>
+#ifdef CONFIG_FSA9480_MICROUSB
+#ifdef CONFIG_HAS_WAKELOCK
+#include <linux/wakelock.h>
+#endif
+#include "fsa9480_i2c.h"
+#endif
+
+#include <linux/usb/composite.h>
+
+#ifdef  CONFIG_MICROUSBIC_INTR
+#define USB_DETECT_GPIO           
+#endif
+#ifdef USB_DETECT_GPIO
+	#include <linux/irq.h>
+	#include <mach/gpio.h>
+	//#include"../../arch/arm/mach-omap2/ti-compat.h"
+	//#include"../../arch/arm/mach-omap2/prcm-regs.h"
+#ifdef CONFIG_MICROUSBIC_INTR 
+	#include <mach/microusbic.h>
+#endif
+	struct work_struct 	usb_detect_work;
+#define 	IRQT_BOTHEDGE  0x03
+#endif
 
 /* Register defines */
 
@@ -238,6 +261,18 @@
 #define PMBR1				0x0D
 #define GPIO_USB_4PIN_ULPI_2430C	(3 << 0)
 
+#ifdef USB_DETECT_GPIO
+int twl4030_usb_device_connected(void);
+int get_usbic_state(void);
+#define MICROUSBIC_USB_CABLE  1
+struct twl4030_usb *t2_transceiver;
+
+EXPORT_SYMBOL(t2_transceiver);
+extern struct twl4030_usb;
+extern void musb_platform_cable_mgr(bool );
+extern int check_device_removed();
+#endif
+
 struct twl4030_usb {
 	struct otg_transceiver	otg;
 	struct device		*dev;
@@ -257,11 +292,21 @@ struct twl4030_usb {
 	u8			linkstat;
 	u8			asleep;
 	bool			irq_enabled;
+#ifdef USB_DETECT_GPIO
+	void (*link_context_cable)(bool );
+#endif
+#if defined(CONFIG_HAS_WAKELOCK) && defined(CONFIG_FSA9480_MICROUSB)
+	struct wake_lock wake_lock;
+#endif
+
 };
 
 /* internal define on top of container_of */
 #define xceiv_to_twl(x)		container_of((x), struct twl4030_usb, otg);
 
+#ifdef CONFIG_FSA9480_MICROUSB
+struct twl4030_usb *usb_transceiver;
+#endif
 /*-------------------------------------------------------------------------*/
 
 static int twl4030_i2c_write_u8_verify(struct twl4030_usb *twl,
@@ -342,6 +387,17 @@ twl4030_usb_clear_bits(struct twl4030_usb *twl, u8 reg, u8 bits)
 
 static enum usb_xceiv_events twl4030_usb_linkstat(struct twl4030_usb *twl)
 {
+#ifdef CONFIG_FSA9480_MICROUSB
+	int	linkstat = USB_EVENT_NONE;
+
+	if(get_real_usbic_state() == MICROUSBIC_USB_CABLE)
+//	if(0)
+	{
+		linkstat = USB_EVENT_VBUS;
+	}
+
+	return linkstat;
+#else
 	int	status;
 	int	linkstat = USB_EVENT_NONE;
 
@@ -386,6 +442,7 @@ static enum usb_xceiv_events twl4030_usb_linkstat(struct twl4030_usb *twl)
 	spin_unlock_irq(&twl->lock);
 
 	return linkstat;
+#endif
 }
 
 static void twl4030_usb_set_mode(struct twl4030_usb *twl, int mode)
@@ -479,8 +536,20 @@ static void twl4030_phy_suspend(struct twl4030_usb *twl, int controller_off)
 	if (twl->asleep)
 		return;
 
+		
+#ifdef USB_DETECT_GPIO
+	//twl4030_phy_power(twl, 0);
+	twl->asleep = 1;
+	if (twl->link_context_cable)
+		twl->link_context_cable(0);       
+#else
 	twl4030_phy_power(twl, 0);
 	twl->asleep = 1;
+#endif
+
+#if defined(CONFIG_HAS_WAKELOCK) && defined(CONFIG_FSA9480_MICROUSB)
+	wake_unlock(&twl->wake_lock);
+#endif
 }
 
 static void twl4030_phy_resume(struct twl4030_usb *twl)
@@ -493,10 +562,20 @@ static void twl4030_phy_resume(struct twl4030_usb *twl)
 
 	twl4030_phy_power(twl, 1);
 	twl4030_i2c_access(twl, 1);
+	
+#ifdef  CONFIG_FSA9480_NOTIFY_USB_CONNECTION_STATE	
+	/*set CARKIT_ANA_CTRL register to 0x08 to enable ADC input*/
+	WARN_ON(twl4030_usb_write_verify(twl, CARKIT_ANA_CTRL ,0x08) < 0);
+#endif
+
 	twl4030_usb_set_mode(twl, twl->usb_mode);
 	if (twl->usb_mode == T2_USB_MODE_ULPI)
 		twl4030_i2c_access(twl, 0);
 	twl->asleep = 0;
+#ifdef USB_DETECT_GPIO
+	if (twl->link_context_cable)
+			twl->link_context_cable(1);
+#endif
 }
 
 static int twl4030_usb_ldo_init(struct twl4030_usb *twl)
@@ -567,6 +646,111 @@ static ssize_t twl4030_usb_vbus_show(struct device *dev,
 	return ret;
 }
 static DEVICE_ATTR(vbus, 0444, twl4030_usb_vbus_show, NULL);
+
+#ifndef USB_DETECT_GPIO
+static int skip_init = 0;
+static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
+{
+	struct twl4030_usb *twl = _twl;
+	struct otg_transceiver x = twl->otg;
+	int status;
+
+#ifdef CONFIG_LOCKDEP
+	/* WORKAROUND for lockdep forcing IRQF_DISABLED on us, which
+	 * we don't want and can't tolerate.  Although it might be
+	 * friendlier not to borrow this thread context...
+	 */
+	local_irq_enable();
+#endif
+
+	status = twl4030_usb_linkstat(twl);
+	if (status >= 0) {
+		/* FIXME add a set_power() method so that B-devices can
+		 * configure the charger appropriately.  It's not always
+		 * correct to consume VBUS power, and how much current to
+		 * consume is a function of the USB configuration chosen
+		 * by the host.
+		 *
+		 * REVISIT usb_gadget_vbus_connect(...) as needed, ditto
+		 * its disconnect() sibling, when changing to/from the
+		 * USB_LINK_VBUS state.  musb_hdrc won't care until it
+		 * starts to handle softconnect right.
+		 */
+		if (status == USB_EVENT_NONE)
+		{
+			twl4030_phy_suspend(twl, 0);
+			if(skip_init)
+			{ 
+				usb_gadget_disconnect(twl->otg.gadget);
+				usb_gadget_vbus_disconnect(twl->otg.gadget);
+				//printk("[twl4030] usb_gadget_disconnect ---------\n");
+			}
+			blocking_notifier_call_chain(&twl->otg.notifier, status,
+				twl->otg.gadget);
+		}
+		else   {
+#if defined(CONFIG_HAS_WAKELOCK) && defined(CONFIG_FSA9480_MICROUSB)
+			wake_lock(&twl->wake_lock);
+#endif
+			twl4030_phy_resume(twl);
+			if(skip_init)
+			{
+				usb_gadget_connect(twl->otg.gadget);
+				//printk("[twl4030] usb_gadget_connect +++++++++\n");
+			}
+		}
+
+		blocking_notifier_call_chain(&twl->otg.notifier, status,
+				twl->otg.gadget);
+	}
+	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
+	skip_init = 1;
+
+	return IRQ_HANDLED;
+}
+#else /* USB_DETECT_GPIO */
+void twl4030_usb_detect_handler(struct work_struct* work)
+{
+	
+	int status;
+	struct twl4030_usb *twl = t2_transceiver;
+	struct otg_transceiver x = twl->otg;
+
+	int is_connected = twl4030_usb_device_connected();
+
+
+	status = twl4030_usb_linkstat(twl);
+	if(is_connected){	
+		printk("[t2usb] PDA usb is connected \n");
+			if (x.link_force_active)
+				x.link_force_active(1);
+		twl4030_phy_resume(twl);
+		sysfs_notify(&twl->dev->kobj, NULL, "vbus");
+	}
+	else	{
+
+		printk("[t2usb] PDA usb is disconnected \n ");
+			if (x.link_force_active)
+				x.link_force_active(0);
+		twl4030_phy_suspend(twl,0);
+		sysfs_notify(&twl->dev->kobj, NULL, "vbus");	
+		
+	}
+		    
+
+}
+static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
+{
+	int *id = (int*)_twl;
+	if(*id == 0x3)	{
+		printk("[t2 usb] dcm interrupt \n");
+		return IRQ_HANDLED;
+	}
+
+	schedule_work(&usb_detect_work);
+
+}
+#endif // USB_DETECT_GPIO
 
 static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
 {
@@ -642,11 +826,48 @@ static int twl4030_set_host(struct otg_transceiver *x, struct usb_bus *host)
 	return 0;
 }
 
+#ifdef USB_DETECT_GPIO
+int twl4030_usb_device_connected(void)
+{
+#ifdef CONFIG_MICROUSBIC_INTR 
+	return (get_usbic_state()== MICROUSBIC_USB_CABLE);
+#endif 
+	return 0;
+}
+
+int check_device_connected()
+{
+	struct twl4030_usb *twl = t2_transceiver;
+
+	if(twl4030_usb_device_connected()){
+
+	twl4030_phy_resume(twl);
+
+	}
+}
+
+int check_device_removed()
+{
+	struct twl4030_usb *twl = t2_transceiver;
+
+	if(!twl4030_usb_device_connected()){
+
+	twl4030_phy_power(twl, 0);
+
+	}
+}
+#endif
+
 static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 {
 	struct twl4030_usb_data *pdata = pdev->dev.platform_data;
 	struct twl4030_usb	*twl;
 	int			status, err;
+
+#ifdef USB_DETECT_GPIO
+	if (t2_transceiver)
+		return 0;
+#endif
 
 	if (!pdata) {
 		dev_dbg(&pdev->dev, "platform_data not available\n");
@@ -656,6 +877,11 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 	twl = kzalloc(sizeof *twl, GFP_KERNEL);
 	if (!twl)
 		return -ENOMEM;
+
+#ifdef USB_DETECT_GPIO
+	t2_transceiver = twl;
+	t2_transceiver->link_context_cable = musb_platform_cable_mgr ;
+#endif
 
 	twl->dev		= &pdev->dev;
 	twl->irq		= platform_get_irq(pdev, 0);
@@ -692,16 +918,50 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 	 * set_host() and/or set_peripheral() ... OTG_capable boards
 	 * need both handles, otherwise just one suffices.
 	 */
+#ifndef USB_DETECT_GPIO
+#ifdef CONFIG_FSA9480_MICROUSB
+	usb_transceiver = twl;
+
+#ifdef CONFIG_HAS_WAKELOCK
+	wake_lock_init(&twl->wake_lock, WAKE_LOCK_SUSPEND, "usb_transceiver");
+#endif
+
+	microusb_enable();
+#else
 	twl->irq_enabled = true;
-	status = request_threaded_irq(twl->irq, NULL, twl4030_usb_irq,
-			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
+	status = request_threaded_irq(twl->irq, NULL, twl4030_usb_irq, IRQF_SHARED,
 			"twl4030_usb", twl);
+	
+	set_irq_type( twl->irq, IRQ_TYPE_EDGE_BOTH );
+	
 	if (status < 0) {
 		dev_dbg(&pdev->dev, "can't get IRQ %d, err %d\n",
 			twl->irq, status);
 		kfree(twl);
 		return status;
 	}
+#endif
+#else
+	INIT_WORK(&usb_detect_work, twl4030_usb_detect_handler);
+	twl->irq		= IH_USBIC_BASE;
+	set_irq_type(twl->irq, 3);              //IRQT_BOTHEDGE        
+
+	status = request_irq(twl->irq, twl4030_usb_irq, IRQF_DISABLED|IRQF_SHARED, "twl4030_usb",twl);
+	if (status < 0) {
+		dev_dbg(&pdev->dev, "can't get IRQ %d, err %d\n",
+			twl->irq, status);
+		kfree(twl);
+		return status;
+	}
+
+	printk("[t2usb] get IRQ %d status %d \n",twl->irq, status);
+
+	// Check if USB cable is connected on booting
+	if(twl4030_usb_device_connected()){
+	//! Need to decide what to do
+	twl4030_phy_resume(twl);
+	}
+#endif // USB_DETECT_GPIO
 
 	/* The IRQ handler just handles changes from the previous states
 	 * of the ID and VBUS pins ... in probe() we must initialize that
@@ -721,6 +981,12 @@ static int __exit twl4030_usb_remove(struct platform_device *pdev)
 {
 	struct twl4030_usb *twl = platform_get_drvdata(pdev);
 	int val;
+
+#ifdef CONFIG_FSA9480_MICROUSB
+	microusb_disable();
+
+	usb_transceiver = NULL;
+#endif
 
 	free_irq(twl->irq, twl);
 	device_remove_file(twl->dev, &dev_attr_vbus);
@@ -752,6 +1018,37 @@ static int __exit twl4030_usb_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_FSA9480_MICROUSB
+void microusb_usbjig_detect(void)
+{
+	struct twl4030_usb *twl = usb_transceiver;
+
+	(void)twl4030_usb_irq(twl->irq, twl);
+}
+EXPORT_SYMBOL(microusb_usbjig_detect);
+#endif
+
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_MENU_SEL
+void ap_usb_power_on(int on)
+{
+   struct twl4030_usb *twl = usb_transceiver;
+
+   /*set forcely usb power*/
+   if(on)
+   	{
+   	/*power on*/
+	printk("[USB] %s : Force power on\n",__func__);
+   	twl4030_phy_resume(twl);
+   	}
+   else
+   	{
+   	printk("[USB] %s : Force power off\n",__func__);
+   	twl4030_phy_suspend(twl,0);
+   	}
+}
+EXPORT_SYMBOL(ap_usb_power_on);
+#endif
+
 static struct platform_driver twl4030_usb_driver = {
 	.probe		= twl4030_usb_probe,
 	.remove		= __exit_p(twl4030_usb_remove),
@@ -769,6 +1066,9 @@ subsys_initcall(twl4030_usb_init);
 
 static void __exit twl4030_usb_exit(void)
 {
+#ifdef USB_DETECT_GPIO
+	struct twl4030_usb *twl = t2_transceiver;
+#endif
 	platform_driver_unregister(&twl4030_usb_driver);
 }
 module_exit(twl4030_usb_exit);

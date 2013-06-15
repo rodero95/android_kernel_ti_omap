@@ -5,6 +5,8 @@
 # infrastructure
 obj-$(CONFIG_USB_OTG_UTILS)	+= otg.o
 
+obj-$(CONFIG_MICROUSBIC_INTR)	+= microusbic/
+obj-$(CONFIG_FSA9480_MICROUSB)	+= fsa9480_i2c.o
 # transceiver drivers
 obj-$(CONFIG_USB_GPIO_VBUS)	+= gpio_vbus.o
 obj-$(CONFIG_ISP1301_OMAP)	+= isp1301_omap.o
