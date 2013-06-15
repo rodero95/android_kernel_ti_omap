@@ -230,19 +230,26 @@ fail:
 
 static void __init omap_latona_init(void)
 {
+	printk("\n");
+	printk("-----------------------------------------------------------\n");
+	printk("  Latona board init \n");
+	printk("\n");
+	printk("  Mux init...\n");
 	omap3_mux_init(latona_board_mux_ptr, OMAP_PACKAGE_CBP);
-	sec_mux_init_gpio_out();
-	sec_mux_set_wakeup_gpio();
+	latona_mux_init_gpio_out();
+	latona_mux_set_wakeup_gpio();
 	config_wlan_mux();
-
+	
+	printk("  Peripherals init...\n");
 	latona_peripherals_init();
+	printk("  Onenand init...\n");
 	latona_onenand_init();
+	printk("  Latona Display and OMAP DSS init...\n");
 	latona_display_init(OMAP_DSS_VENC_TYPE_COMPOSITE);
 
-	omap_mux_init_gpio(64, OMAP_PIN_OUTPUT);
-	omap_mux_init_gpio(109, OMAP_PIN_OUTPUT);
-	omap_mux_init_gpio(161, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(LATONA_EHCI_RESET_GPIO, OMAP_PIN_OUTPUT);
 	omap_mux_init_gpio(LATONA_McBSP3_BT_GPIO, OMAP_PIN_OUTPUT);
+	printk("  USB init...\n");
 	usb_uhhtll_init(&usbhs_pdata);
 	sr_class1p5_init();
 
@@ -253,8 +260,11 @@ static void __init omap_latona_init(void)
 #endif
 	omap_voltage_init_vc(&vc_config);
 #endif
+	printk("  Latona Devices init...\n");
 	platform_add_devices(latona_devices, ARRAY_SIZE(latona_devices));
 	wl127x_vio_leakage_fix();
+	printk("  Latona board init done.\n");
+	printk("-----------------------------------------------------------\n");
 }
 
 static void __init omap_latona_fixup(struct machine_desc *desc,

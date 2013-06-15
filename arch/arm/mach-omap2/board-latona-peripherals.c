@@ -80,24 +80,6 @@ extern struct imx046_platform_data latona_lv8093_platform_data;
 #define LV8093_PWR_ON		(!LV8093_PWR_OFF)
 #endif
 
-#ifdef CONFIG_LEDS_OMAP_DISPLAY
-/* PWM output/clock enable for LCD backlight*/
-#define REG_INTBR_GPBR1				0xc
-#define REG_INTBR_GPBR1_PWM1_OUT_EN		(0x1 << 3)
-#define REG_INTBR_GPBR1_PWM1_OUT_EN_MASK	(0x1 << 3)
-#define REG_INTBR_GPBR1_PWM1_CLK_EN		(0x1 << 1)
-#define REG_INTBR_GPBR1_PWM1_CLK_EN_MASK	(0x1 << 1)
-
-/* pin mux for LCD backlight*/
-#define REG_INTBR_PMBR1				0xd
-#define REG_INTBR_PMBR1_PWM1_PIN_EN		(0x3 << 4)
-#define REG_INTBR_PMBR1_PWM1_PIN_MASK		(0x3 << 4)
-
-#define MAX_CYCLES				0x7f
-#define MIN_CYCLES				75
-#define LCD_PANEL_BACKLIGHT_GPIO		(7 + OMAP_MAX_GPIO_LINES)
-#endif
-
 #define BLUETOOTH_UART	UART2
 
 static struct wake_lock uart_lock;
@@ -291,93 +273,8 @@ static struct platform_device headset_switch_device = {
 		}
 };
 
-#ifdef CONFIG_LEDS_OMAP_DISPLAY
-/* omap3 led display */
-static void latona_pwm_config(u8 brightness)
-{
-
-	u8 pwm_off = 0;
-
-	pwm_off = (MIN_CYCLES * (LED_FULL - brightness) +
-		   MAX_CYCLES * (brightness - LED_OFF)) /
-		(LED_FULL - LED_OFF);
-
-	pwm_off = clamp(pwm_off, (u8)MIN_CYCLES, (u8)MAX_CYCLES);
-
-	printk(KERN_DEBUG "PWM Duty cycles = %d\n", pwm_off);
-
-	/* start at 0 */
-	twl_i2c_write_u8(TWL4030_MODULE_PWM1, 0, 0);
-	twl_i2c_write_u8(TWL4030_MODULE_PWM1, pwm_off, 1);
-}
-
-static void latona_pwm_enable(int enable)
-{
-	u8 gpbr1;
-
-	twl_i2c_read_u8(TWL4030_MODULE_INTBR, &gpbr1, REG_INTBR_GPBR1);
-	gpbr1 &= ~REG_INTBR_GPBR1_PWM1_OUT_EN_MASK;
-	gpbr1 |= (enable ? REG_INTBR_GPBR1_PWM1_OUT_EN : 0);
-	twl_i2c_write_u8(TWL4030_MODULE_INTBR, gpbr1, REG_INTBR_GPBR1);
-
-	twl_i2c_read_u8(TWL4030_MODULE_INTBR, &gpbr1, REG_INTBR_GPBR1);
-	gpbr1 &= ~REG_INTBR_GPBR1_PWM1_CLK_EN_MASK;
-	gpbr1 |= (enable ? REG_INTBR_GPBR1_PWM1_CLK_EN : 0);
-	twl_i2c_write_u8(TWL4030_MODULE_INTBR, gpbr1, REG_INTBR_GPBR1);
-}
-
-void omap_set_primary_brightness(u8 brightness)
-{
-	u8 pmbr1;
-	static int latona_pwm1_config;
-	static int latona_pwm1_output_enabled;
-
-	if (latona_pwm1_config == 0) {
-		twl_i2c_read_u8(TWL4030_MODULE_INTBR, &pmbr1, REG_INTBR_PMBR1);
-
-		pmbr1 &= ~REG_INTBR_PMBR1_PWM1_PIN_MASK;
-		pmbr1 |=  REG_INTBR_PMBR1_PWM1_PIN_EN;
-		twl_i2c_write_u8(TWL4030_MODULE_INTBR, pmbr1, REG_INTBR_PMBR1);
-
-		latona_pwm1_config = 1;
-	}
-
-	if (!brightness) {
-		latona_pwm_enable(0);
-		latona_pwm1_output_enabled = 0;
-		return;
-	}
-
-	latona_pwm_config(brightness);
-	if (latona_pwm1_output_enabled == 0) {
-		latona_pwm_enable(1);
-		latona_pwm1_output_enabled = 1;
-	}
-
-	printk(KERN_DEBUG "Latona LCD Backlight brightness = %d\n", brightness);
-}
-
-static struct omap_disp_led_platform_data omap_disp_led_data = {
-	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
-	.primary_display_set = omap_set_primary_brightness,
-	.secondary_display_set = NULL,
-};
-
-static struct platform_device omap_disp_led = {
-	.name   =       "display_led",
-	.id     =       -1,
-	.dev    = {
-		.platform_data = &omap_disp_led_data,
-	},
-};
-/* end led Display */
-#endif
-
 static struct platform_device *latona_board_devices[] __initdata = {
 	&headset_switch_device,
-#ifdef CONFIG_LEDS_OMAP_DISPLAY
-	&omap_disp_led,
-#endif
 #ifdef CONFIG_INPUT_ZEUS_EAR_KEY
 	&board_ear_key_device,
 #endif
@@ -470,12 +367,6 @@ static int latona_twl_gpio_setup(struct device *dev,
 	latona_vmmc2_supply.dev = mmc[0].dev;
 
 	return 0;
-}
-
-/* EXTMUTE callback function */
-static void latona_set_hs_extmute(int mute)
-{
-	gpio_set_value(LATONA_HEADSET_EXTMUTE_GPIO, mute);
 }
 
 static int latona_batt_table[] = {
