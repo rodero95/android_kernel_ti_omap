@@ -455,9 +455,9 @@ static int latona_twl_gpio_setup(struct device *dev,
 	/* link regulators to MMC adapters ... we "know" the
 	 * regulators will be set up only *after* we return.
 	*/
-	latona_vmmc1_supply.dev = mmc[0].dev;
-	latona_vsim_supply.dev = mmc[0].dev;
-	latona_vmmc2_supply.dev = mmc[1].dev;
+	latona_vmmc1_supply.dev = mmc[1].dev;
+	latona_vsim_supply.dev = mmc[1].dev;
+	latona_vmmc2_supply.dev = mmc[0].dev;
 
 	return 0;
 }
