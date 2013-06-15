@@ -394,6 +394,13 @@ static enum usb_xceiv_events twl4030_usb_linkstat(struct twl4030_usb *twl)
 //	if(0)
 	{
 		linkstat = USB_EVENT_VBUS;
+		
+		spin_lock_irq(&twl->lock);
+		twl->linkstat = linkstat;
+		twl->otg.default_a = false;
+		twl->otg.state = OTG_STATE_B_IDLE;
+		twl->otg.last_event = linkstat;
+		spin_unlock_irq(&twl->lock);
 	}
 
 	return linkstat;
